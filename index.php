@@ -3,38 +3,38 @@ require_once 'config/database.php';
 $database = new Database();
 $db = $database->getConnection();
 
-// --- LÓGICA DE PROCESAMIENTO (POST) ---
+// --- LÓGICA DE PROCESAMIENTO ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['update_nota'])) {
-        $stmt = $db->prepare("UPDATE examenes SET nota_sacada = ? WHERE id = ?");
-        $stmt->execute([$_POST['nota_sacada'], $_POST['examen_id']]);
-        header("Location: index.php"); exit;
-    }
+    // Registro de Tareas o Exámenes
     if (isset($_POST['materia'])) {
         $tipo = $_POST['tipo'] ?? 'Tarea';
         $materia = $_POST['materia'];
         $fecha = !empty($_POST['fecha']) ? $_POST['fecha'] : date('Y-m-d');
-        $n_est = ($_POST['nota_estimada'] !== '' && $_POST['nota_estimada'] !== null) ? $_POST['nota_estimada'] : NULL;
         $anot = $_POST['anotaciones'] ?? '';
 
-        try {
-            $stmt = $db->prepare("INSERT INTO examenes (materia, fecha, hora, tipo, nota_estimada, anotaciones, completado) VALUES (?, ?, '00:00', ?, ?, ?, 0)");
-            $stmt->execute([$materia, $fecha, $tipo, $n_est, $anot]);
-            header("Location: index.php"); exit;
-        } catch (PDOException $e) { die("Error en UniMa: " . $e->getMessage()); }
+        $stmt = $db->prepare("INSERT INTO examenes (materia, fecha, tipo, anotaciones, completado) VALUES (?, ?, ?, ?, 0)");
+        $stmt->execute([$materia, $fecha, $tipo, $anot]);
+        header("Location: index.php"); exit;
     }
 }
 
-// --- ACCIONES RÁPIDAS (GET) ---
+// Acciones rápidas
 if(isset($_GET['toggle'])) { $db->query("UPDATE examenes SET completado = 1 - completado WHERE id = ".(int)$_GET['toggle']); header("Location: index.php"); exit; }
 if(isset($_GET['del'])) { $db->query("DELETE FROM examenes WHERE id = ".(int)$_GET['del']); header("Location: index.php"); exit; }
 
+// --- CARGA DE DATOS ---
 $dias_trad = ['Monday'=>'Lunes','Tuesday'=>'Martes','Wednesday'=>'Miércoles','Thursday'=>'Jueves','Friday'=>'Viernes','Saturday'=>'Sábado','Sunday'=>'Domingo'];
-$hoy = $dias_trad[date('l')];
+$hoy_nom = $dias_trad[date('l')];
 
-$clases = $db->query("SELECT * FROM horarios WHERE dia_semana = '$hoy' ORDER BY hora_inicio ASC")->fetchAll(PDO::FETCH_ASSOC);
+$clases = $db->query("SELECT * FROM horarios WHERE dia_semana = '$hoy_nom' ORDER BY hora_inicio ASC")->fetchAll(PDO::FETCH_ASSOC);
 $tareas = $db->query("SELECT * FROM examenes WHERE tipo = 'Tarea' ORDER BY completado ASC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
-$evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo') ORDER BY fecha ASC")->fetchAll(PDO::FETCH_ASSOC);
+$examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo') AND fecha >= CURDATE() ORDER BY fecha ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// Progreso semanal
+$total_t = count($tareas);
+$hechas_t = 0;
+foreach($tareas as $t) { if($t['completado']) $hechas_t++; }
+$progreso = ($total_t > 0) ? round(($hechas_t / $total_t) * 100) : 0;
 ?>
 
 <!DOCTYPE html>
@@ -49,61 +49,84 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
         body { background: #f8fafc; font-family: 'Plus Jakarta Sans', sans-serif; color: #1e293b; }
         .card-u { background: white; border-radius: 24px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); margin-bottom: 20px; border: none; }
         .fw-800 { font-weight: 800; }
-        .strikethrough { text-decoration: line-through; opacity: 0.5; }
-        .check-btn { width: 22px; height: 22px; border: 2px solid #cbd5e1; border-radius: 6px; cursor: pointer; display: inline-block; transition: 0.2s; }
-        .check-btn.done { background: #22c55e; border-color: #22c55e; position: relative; }
-        .check-btn.done::after { content: '✓'; color: white; position: absolute; left: 4px; top: -3px; font-weight: bold; }
-        .bus-badge { background: #eef2ff; color: #4338ca; padding: 4px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; margin: 2px; display: inline-block; }
-        .badge-tipo { font-size: 0.6rem; padding: 2px 8px; border-radius: 6px; font-weight: 800; text-transform: uppercase; margin-bottom: 5px; display: inline-block; }
-        .bg-examen { background: #fee2e2; color: #ef4444; }
-        .bg-trabajo { background: #e0f2fe; color: #0ea5e9; }
         .text-primary-u { color: #4338ca !important; }
-        .time-box { border-right: 2px solid #e2e8f0; padding-right: 15px; margin-right: 15px; min-width: 70px; text-align: center; }
-        .anotacion-preview { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 8px; border-radius: 10px; margin-top: 10px; display: none; }
-        .clickable-title { cursor: pointer; transition: 0.2s; }
-        .clickable-title:hover { color: #4338ca; }
+        .strikethrough { text-decoration: line-through; opacity: 0.5; }
+        
+        /* Hub Enlaces */
+        .hub-link { background: white; padding: 12px; border-radius: 15px; text-decoration: none; color: #1e293b; font-weight: 700; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; transition: 0.2s; }
+        .hub-link:hover { border-color: #4338ca; color: #4338ca; transform: translateY(-2px); }
+
+        /* Countdown */
+        .cd-card { background: #1e293b; color: white; border-radius: 18px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .timer-unit { text-align: center; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 8px; min-width: 45px; margin-left: 5px; }
+        .timer-val { display: block; font-size: 1rem; font-weight: 800; }
+        .timer-label { font-size: 0.5rem; text-transform: uppercase; opacity: 0.6; }
+
+        /* Bus Badges */
+        .bus-badge { background: #eef2ff; color: #4338ca; padding: 3px 8px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; margin: 2px; display: inline-block; }
+        .bus-badge-vta { background: #fff1f2; color: #ef4444; }
+
+        /* Progress Bar */
+        .progress { height: 8px; background: #e2e8f0; border-radius: 10px; }
+        .progress-bar { background: #4338ca; }
     </style>
 </head>
-<body class="p-4">
+<body class="p-3 p-md-4">
 <div class="container">
-    <header class="d-flex justify-content-between align-items-center mb-5">
-        <div>
-            <h1 class="fw-800 mb-0 text-primary-u" style="letter-spacing: -1.5px;">UniMa 🚀</h1>
-            <p class="text-muted small fw-600 mb-0">UJI - Lucia P</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="gestion_evaluables.php" class="btn btn-outline-primary rounded-pill px-4 shadow-sm fw-bold">📝 Notas y Trabajos</a>
-            <a href="gestion_clases.php" class="btn btn-dark rounded-pill px-4 shadow-sm">⚙️ Horario</a>
-        </div>
-    </header>
+    
+    <div class="row g-2 mb-4">
+        <div class="col-6 col-md-3"><a href="https://aulavirtual.uji.es/" target="_blank" class="hub-link">🎓 Aula Virtual</a></div>
+        <div class="col-6 col-md-3"><a href="https://mail.google.com/mail/u/0/#inbox" target="_blank" class="hub-link">📧 Gmail UJI</a></div>
+        <div class="col-6 col-md-3"><a href="https://sia.uji.es/" target="_blank" class="hub-link">📑 SIA</a></div>
+        <div class="col-6 col-md-3"><a href="https://www.uji.es/biblioteca/" target="_blank" class="hub-link">📚 Biblioteca</a></div>
+    </div>
 
     <div class="row g-4">
         <div class="col-lg-7">
+            
             <div class="card-u" style="border-left: 6px solid #4338ca;">
                 <h6 class="fw-800 text-primary-u mb-3">🚌 BUS 360: LA VALL ↔ UJI</h6>
-                <div class="row small text-center">
-                    <div class="col-6 pe-1">
-                        <span class="fw-bold d-block mb-2 text-muted" style="font-size: 0.7rem;">➡️ IDA (Desde La Vall)</span>
+                <div class="row small">
+                    <div class="col-6 text-center">
+                        <span class="fw-bold d-block mb-1 text-muted">IDA</span>
                         <?php $ida = ['06:40', '07:50', '09:10', '09:50', '10:50', '11:50', '12:50', '13:45', '15:00', '15:50', '16:30', '17:40', '18:30', '19:45', '20:40']; 
                         foreach($ida as $h) echo "<span class='bus-badge'>$h</span>"; ?>
                     </div>
-                    <div class="col-6 ps-1 border-start">
-                        <span class="fw-bold d-block mb-2 text-muted" style="font-size: 0.7rem;">⬅️ VUELTA (Desde UJI)</span>
+                    <div class="col-6 text-center border-start">
+                        <span class="fw-bold d-block mb-1 text-muted">VUELTA</span>
                         <?php $vta = ['07:50', '09:05', '10:25', '11:15', '12:05', '13:05', '14:05', '15:00', '16:15', '17:05', '17:45', '19:00', '19:50', '21:00', '22:00']; 
-                        foreach($vta as $h) echo "<span class='bus-badge text-danger' style='background:#fff1f2;'>$h</span>"; ?>
+                        foreach($vta as $h) echo "<span class='bus-badge bus-badge-vta'>$h</span>"; ?>
                     </div>
                 </div>
             </div>
 
-            <div class="card-u">
-                <h5 class="fw-800 mb-4">Agenda de hoy (<?= $hoy ?>)</h5>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-800 mb-0">⏳ Cuenta atrás Exámenes</h5>
+                <button class="btn btn-sm btn-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#addE">+</button>
+            </div>
+            <?php foreach($examenes as $ex): ?>
+                <div class="cd-card">
+                    <div>
+                        <h6 class="fw-800 mb-0" style="font-size: 0.9rem;"><?= $ex['materia'] ?></h6>
+                        <small class="opacity-75" style="font-size: 0.7rem;"><?= $ex['tipo'] ?> - <?= date('d/m', strtotime($ex['fecha'])) ?></small>
+                    </div>
+                    <div class="d-flex countdown-engine" data-date="<?= $ex['fecha'] ?> 09:00:00">
+                        <div class="timer-unit"><span class="timer-val days">-</span><span class="timer-label">d</span></div>
+                        <div class="timer-unit"><span class="timer-val hours">-</span><span class="timer-label">h</span></div>
+                        <div class="timer-unit"><span class="timer-val mins">-</span><span class="timer-label">m</span></div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+
+            <div class="card-u mt-4">
+                <h5 class="fw-800 mb-4">Agenda de hoy (<?= $hoy_nom ?>)</h5>
                 <?php if($clases): foreach($clases as $c): ?>
                     <div class="d-flex align-items-center mb-3 p-3 bg-light rounded-4 border-start border-primary border-4" style="border-color: #4338ca !important;">
-                        <div class="time-box">
-                            <div class="fw-bold text-primary-u" style="font-size: 1.1rem; line-height: 1;"><?= substr($c['hora_inicio'],0,5) ?></div>
-                            <div class="text-muted" style="font-size: 0.7rem; margin-top: 4px;"><?= substr($c['hora_fin'],0,5) ?></div>
+                        <div class="me-3 text-center">
+                            <div class="fw-bold text-primary-u small"><?= substr($c['hora_inicio'],0,5) ?></div>
+                            <div class="text-muted" style="font-size: 0.6rem;"><?= substr($c['hora_fin'],0,5) ?></div>
                         </div>
-                        <div><div class="fw-bold"><?= $c['materia'] ?></div><small class="text-muted">📍 Aula <?= $c['aula'] ?></small></div>
+                        <div><div class="fw-bold small"><?= $c['materia'] ?></div><small class="text-muted">Aula <?= $c['aula'] ?></small></div>
                     </div>
                 <?php endforeach; else: ?>
                     <p class="text-muted small">Sin clases hoy.</p>
@@ -112,80 +135,71 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
         </div>
 
         <div class="col-lg-5">
+            <div class="card-u">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="fw-800 mb-0">📊 Mi Progreso</h6>
+                    <span class="fw-bold text-primary-u small"><?= $progreso ?>%</span>
+                </div>
+                <div class="progress mb-2"><div class="progress-bar" style="width: <?= $progreso ?>%"></div></div>
+                <small class="text-muted" style="font-size: 0.7rem;"><?= $hechas_t ?> de <?= $total_t ?> tareas completadas</small>
+            </div>
+
             <div class="card-u bg-success text-white">
-                <small class="fw-bold opacity-75">MENÚ UJI</small>
-                <h5 class="fw-800 mb-3">Cafetería</h5>
-                <a href="https://ujiapps.uji.es/ade/rest/storage/P4LFVSDOBJDUDE3EQFGR21LJEBWR1W31" target="_blank" class="btn btn-light w-100 fw-bold rounded-pill text-success shadow-sm">📂 Abrir Menú</a>
+                <h6 class="fw-800 mb-2">🍽️ Menú Cafetería</h6>
+                <a href="https://ujiapps.uji.es/ade/rest/storage/P4LFVSDOBJDUDE3EQFGR21LJEBWR1W31" target="_blank" class="btn btn-light btn-sm w-100 fw-bold rounded-pill text-success">Ver PDF de la semana</a>
             </div>
 
             <div class="card-u">
-                <div class="d-flex justify-content-between mb-4"><h5 class="fw-800 mb-0">✅ Tareas</h5><button class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#addT">+</button></div>
+                <div class="d-flex justify-content-between mb-3"><h6 class="fw-800 mb-0">✅ Tareas</h6><button class="btn btn-sm btn-primary rounded-circle" data-bs-toggle="modal" data-bs-target="#addT">+</button></div>
                 <?php foreach($tareas as $t): ?>
-                    <div class="d-flex justify-content-between mb-2 p-1 border-bottom border-light">
-                        <div class="d-flex align-items-center"><a href="?toggle=<?= $t['id'] ?>" class="check-btn me-2 <?= $t['completado']?'done':'' ?>"></a> <span class="<?= $t['completado']?'strikethrough':'' ?>"><?= $t['materia'] ?></span></div>
-                        <a href="?del=<?= $t['id'] ?>" class="text-danger opacity-25 text-decoration-none">✕</a>
+                    <div class="d-flex justify-content-between align-items-center mb-2 small">
+                        <div>
+                            <a href="?toggle=<?= $t['id'] ?>" class="btn btn-sm p-0 me-2"><?= $t['completado']?'🟢':'⚪' ?></a>
+                            <span class="<?= $t['completado']?'strikethrough':'' ?>"><?= $t['materia'] ?></span>
+                        </div>
+                        <a href="?del=<?= $t['id'] ?>" class="text-danger opacity-25">✕</a>
                     </div>
                 <?php endforeach; ?>
             </div>
 
-            <div class="card-u">
-                <div class="d-flex justify-content-between mb-4"><h5 class="fw-800 mb-0">📝 Evaluable</h5><button class="btn btn-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#addE">+</button></div>
-                <?php foreach($evaluables as $e): ?>
-                    <div class="p-3 border rounded-4 mb-3 position-relative bg-light shadow-sm">
-                        <span class="badge-tipo <?= $e['tipo'] == 'Examen' ? 'bg-examen' : 'bg-trabajo' ?>"><?= $e['tipo'] ?></span>
-                        <div class="fw-bold small mb-2 text-muted clickable-title" onclick="toggleAnot(<?= $e['id'] ?>)" style="font-size: 0.75rem;">
-                            <?= $e['materia'] ?> 🔽
-                        </div>
-                        
-                        <div id="anot-<?= $e['id'] ?>" class="anotacion-preview">
-                            <strong>Anotaciones:</strong><br><?= !empty($e['anotaciones']) ? nl2br($e['anotaciones']) : 'Sin notas' ?>
-                        </div>
-
-                        <div class="row g-2 small text-center align-items-center mt-2">
-                            <div class="col-5"><span class="d-block opacity-75" style="font-size: 0.6rem;">PREVISTA</span><b><?= $e['nota_estimada'] ?? '-' ?></b></div>
-                            <div class="col-2 text-muted">→</div>
-                            <div class="col-5">
-                                <span class="d-block opacity-75" style="font-size: 0.6rem;">REAL</span>
-                                <?php if($e['nota_sacada'] !== null): ?>
-                                    <b class="text-success fs-6"><?= $e['nota_sacada'] ?></b>
-                                <?php else: ?>
-                                    <button class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold" style="font-size: 0.6rem;" data-bs-toggle="modal" data-bs-target="#editNota<?= $e['id'] ?>">+ NOTA</button>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-
-                        <div class="modal fade" id="editNota<?= $e['id'] ?>" tabindex="-1"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content p-3 rounded-4 border-0 shadow">
-                            <h6 class="fw-800 mb-3 text-center">Añadir Nota Final</h6>
-                            <form method="POST"><input type="hidden" name="examen_id" value="<?= $e['id'] ?>"><input type="number" step="0.1" name="nota_sacada" class="form-control mb-3 text-center fs-4" placeholder="0.0" required><button type="submit" name="update_nota" class="btn btn-primary w-100 rounded-pill">Guardar</button></form>
-                        </div></div></div>
-                        <a href="?del=<?= $e['id'] ?>" class="position-absolute top-0 end-0 m-2 text-danger opacity-25">✕</a>
-                    </div>
-                <?php endforeach; ?>
+            <div class="d-grid gap-2">
+                <a href="gestion_clases.php" class="btn btn-dark rounded-pill py-2 fw-bold">⚙️ Gestionar Clases</a>
+                <a href="gestion_evaluables.php" class="btn btn-outline-primary rounded-pill py-2 fw-bold">📈 Ver Notas Reales</a>
             </div>
         </div>
     </div>
 </div>
 
-<div class="modal fade" id="addT" tabindex="-1"><div class="modal-dialog"><div class="modal-content p-4 rounded-4 shadow border-0 text-center">
-    <h5 class="fw-800 mb-3">Nueva Tarea</h5><form method="POST"><input type="hidden" name="tipo" value="Tarea"><input type="text" name="materia" class="form-control mb-3" required><button type="submit" class="btn btn-primary w-100 rounded-pill">Añadir</button></form>
-</div></div></div>
-
-<div class="modal fade" id="addE" tabindex="-1"><div class="modal-dialog"><div class="modal-content p-4 rounded-4 shadow border-0">
-    <h5 class="fw-800 mb-3 text-center">Nuevo Registro</h5>
+<div class="modal fade" id="addE" tabindex="-1"><div class="modal-dialog"><div class="modal-content p-4 rounded-4 border-0 shadow">
+    <h5 class="fw-800 mb-3 text-center">Nuevo Examen/Trabajo</h5>
     <form method="POST">
-        <select name="tipo" class="form-select mb-3 rounded-pill"><option value="Examen">Examen</option><option value="Trabajo">Trabajo</option></select>
-        <input type="text" name="materia" class="form-control mb-3 rounded-pill" placeholder="Asignatura" required>
-        <div class="row"><div class="col-6"><input type="date" name="fecha" class="form-control mb-3 rounded-pill"></div><div class="col-6"><input type="number" step="0.1" name="nota_estimada" class="form-control mb-3 rounded-pill" placeholder="Nota Prev."></div></div>
-        <textarea name="anotaciones" class="form-control mb-3" placeholder="Escribe aquí tus anotaciones..." style="border-radius: 15px;"></textarea>
-        <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">Registrar</button>
+        <select name="tipo" class="form-select mb-2 rounded-pill"><option value="Examen">Examen</option><option value="Trabajo">Trabajo</option></select>
+        <input type="text" name="materia" class="form-control mb-2 rounded-pill" placeholder="Asignatura" required>
+        <input type="date" name="fecha" class="form-control mb-3 rounded-pill" required>
+        <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">Guardar</button>
     </form>
 </div></div></div>
 
+<div class="modal fade" id="addT" tabindex="-1"><div class="modal-dialog"><div class="modal-content p-4 rounded-4 border-0 shadow">
+    <h5 class="fw-800 mb-3 text-center">Añadir Tarea</h5>
+    <form method="POST"><input type="hidden" name="tipo" value="Tarea"><input type="text" name="materia" class="form-control mb-3 rounded-pill" placeholder="¿Qué hay que hacer?" required><button type="submit" class="btn btn-primary w-100 rounded-pill">Añadir</button></form>
+</div></div></div>
+
 <script>
-    function toggleAnot(id) {
-        const el = document.getElementById('anot-' + id);
-        el.style.display = (el.style.display === 'block') ? 'none' : 'block';
+    function updateCountdowns() {
+        const timers = document.querySelectorAll('.countdown-engine');
+        timers.forEach(timer => {
+            const target = new Date(timer.getAttribute('data-date')).getTime();
+            const now = new Date().getTime();
+            const diff = target - now;
+            if (diff > 0) {
+                timer.querySelector('.days').innerText = Math.floor(diff / (1000 * 60 * 60 * 24));
+                timer.querySelector('.hours').innerText = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                timer.querySelector('.mins').innerText = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            } else { timer.innerHTML = "<small>¡Hoy!</small>"; }
+        });
     }
+    setInterval(updateCountdowns, 1000); updateCountdowns();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
