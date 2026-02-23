@@ -1,41 +1,43 @@
 <?php
-// 1. CONFIGURACIÓN DE SEGURIDAD PARA SESIONES
+// 1. SOLUCIÓN PARA BUCLES EN CLEVER CLOUD
+// Esto le dice a PHP que confíe en el protocolo HTTPS del servidor de Clever Cloud
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') {
+    $_SERVER['HTTPS'] = 'on';
+}
+
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
 ini_set('session.cookie_secure', 1); 
 
 session_start();
 
-// 2. CONTROL DE ACCESO
+// 2. CONTROL DE ACCESO (EL PORTERO)
 if (!isset($_SESSION['usuario_id']) || empty($_SESSION['usuario_id'])) {
     header("Location: login.php");
-    exit(); 
+    exit(); // Obligatorio para detener el bucle
 }
 
-// Si llega aquí es porque SÍ hay sesión
 $user_id = $_SESSION['usuario_id'];
 require_once 'config/database.php';
 $db = (new Database())->getConnection();
 
 // --- 3. LÓGICA DE PROCESAMIENTO (POST) ---
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['materia'])) {
-        $tipo = $_POST['tipo'] ?? 'Examen';
-        $materia = $_POST['materia'];
-        $fecha = !empty($_POST['fecha']) ? $_POST['fecha'] : date('Y-m-d');
-        $anot = $_POST['anotaciones'] ?? '';
-        $n_est = !empty($_POST['nota_estimada']) ? $_POST['nota_estimada'] : NULL;
-        $n_sac = !empty($_POST['nota_sacada']) ? $_POST['nota_sacada'] : NULL;
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['materia'])) {
+    $tipo = $_POST['tipo'] ?? 'Examen';
+    $materia = $_POST['materia'];
+    $fecha = !empty($_POST['fecha']) ? $_POST['fecha'] : date('Y-m-d');
+    $anot = $_POST['anotaciones'] ?? '';
+    $n_est = !empty($_POST['nota_estimada']) ? $_POST['nota_estimada'] : NULL;
+    $n_sac = !empty($_POST['nota_sacada']) ? $_POST['nota_sacada'] : NULL;
 
-        $stmt = $db->prepare("INSERT INTO examenes (materia, fecha, tipo, anotaciones, nota_estimada, nota_sacada, usuario_id, completado) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
-        $stmt->execute([$materia, $fecha, $tipo, $anot, $n_est, $n_sac, $user_id]);
-        
-        header("Location: index.php"); 
-        exit();
-    }
+    $stmt = $db->prepare("INSERT INTO examenes (materia, fecha, tipo, anotaciones, nota_estimada, nota_sacada, usuario_id, completado) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
+    $stmt->execute([$materia, $fecha, $tipo, $anot, $n_est, $n_sac, $user_id]);
+    
+    header("Location: index.php"); 
+    exit();
 }
 
-// --- 4. ACCIONES RÁPIDAS (SEGURIZADAS) ---
+// --- 4. ACCIONES RÁPIDAS ---
 if(isset($_GET['toggle'])) { 
     $stmt = $db->prepare("UPDATE examenes SET completado = 1 - completado WHERE id = ? AND usuario_id = ?");
     $stmt->execute([(int)$_GET['toggle'], $user_id]);
@@ -50,16 +52,8 @@ if(isset($_GET['del'])) {
     exit(); 
 }
 
-// --- 5. CARGA DE DATOS FILTRADOS POR USUARIO ---
-$dias_trad = [
-    'Monday'    => 'Lunes',
-    'Tuesday'   => 'Martes',
-    'Wednesday' => 'Miércoles',
-    'Thursday'  => 'Jueves',
-    'Friday'    => 'Viernes',
-    'Saturday'  => 'Sábado',
-    'Sunday'    => 'Domingo'
-];
+// --- 5. CARGA DE DATOS ---
+$dias_trad = ['Monday'=>'Lunes','Tuesday'=>'Martes','Wednesday'=>'Miércoles','Thursday'=>'Jueves','Friday'=>'Viernes','Saturday'=>'Sábado','Sunday'=>'Domingo'];
 $hoy_nom = $dias_trad[date('l')];
 
 $stmt_clases = $db->prepare("SELECT * FROM horarios WHERE dia_semana = ? AND usuario_id = ? ORDER BY hora_inicio ASC");

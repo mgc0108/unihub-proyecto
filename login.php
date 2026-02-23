@@ -1,9 +1,14 @@
 <?php
+// SOLUCIÓN PARA BUCLES
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') {
+    $_SERVER['HTTPS'] = 'on';
+}
+
 ini_set('session.cookie_secure', 1);
 ini_set('session.cookie_httponly', 1);
 session_start();
 
-// Si ya está logueado, lo mandamos al index para que no vuelva a loguearse
+// Si ya tiene sesión, no lo dejes entrar al login, mándalo al index
 if (isset($_SESSION['usuario_id'])) {
     header("Location: index.php");
     exit();
@@ -22,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $_SESSION['usuario_id'] = $user['id'];
         $_SESSION['nombre'] = $user['nombre'];
         header("Location: index.php");
-        exit(); // CRUCIAL
+        exit();
     } else {
         $error = "Email o contraseña incorrectos";
     }
