@@ -1,10 +1,17 @@
 <?php
+session_start();
+if (!isset($_SESSION['usuario_id'])) {
+    header("Location: login.php");
+    exit();
+}
+$user_id = $_SESSION['usuario_id'];
 require_once 'config/database.php';
 $db = (new Database())->getConnection();
 
-// --- 1. LÓGICA DE ACTUALIZACIÓN (Cuando pulsas Guardar Cambios) ---
+// --- 1. LÓGICA DE ACTUALIZACIÓN ---
 if(isset($_POST['update_full'])) {
-    $stmt = $db->prepare("UPDATE examenes SET tipo=?, materia=?, fecha=?, nota_estimada=?, nota_sacada=?, anotaciones=? WHERE id=?");
+    // Añadimos usuario_id al final para asegurar que el examen que editas es TUYO
+    $stmt = $db->prepare("UPDATE examenes SET tipo=?, materia=?, fecha=?, nota_estimada=?, nota_sacada=?, anotaciones=? WHERE id=? AND usuario_id=?"); // <--- SEGURIDAD
     $stmt->execute([
         $_POST['tipo'], 
         $_POST['materia'], 
@@ -12,28 +19,32 @@ if(isset($_POST['update_full'])) {
         $_POST['n_est'] ?: NULL, 
         $_POST['n_sac'] ?: NULL, 
         $_POST['anot'], 
-        $_POST['id']
+        $_POST['id'],
+        $user_id // <--- SEGURIDAD
     ]);
     header("Location: gestion_evaluables.php"); exit;
 }
 
 // --- 2. LÓGICA DE BORRADO ---
 if(isset($_GET['del'])) { 
-    $db->query("DELETE FROM examenes WHERE id = ".(int)$_GET['del']); 
+    // Usamos prepare para evitar que borren datos ajenos
+    $stmt = $db->prepare("DELETE FROM examenes WHERE id = ? AND usuario_id = ?"); // <--- SEGURIDAD
+    $stmt->execute([(int)$_GET['del'], $user_id]); // <--- SEGURIDAD
     header("Location: gestion_evaluables.php"); exit; 
 }
 
-// --- 3. CARGAR DATOS PARA EDITAR (Cuando pulsas el botón amarillo) ---
+// --- 3. CARGAR DATOS PARA EDITAR ---
 $edit_item = null;
 if(isset($_GET['edit'])) {
-    $stmt = $db->prepare("SELECT * FROM examenes WHERE id = ?");
-    $stmt->execute([$_GET['edit']]);
+    $stmt = $db->prepare("SELECT * FROM examenes WHERE id = ? AND usuario_id = ?"); // <--- SEGURIDAD
+    $stmt->execute([$_GET['edit'], $user_id]); // <--- SEGURIDAD
     $edit_item = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 // --- 4. CARGAR TODO EL HISTORIAL ---
-// Agrupamos manualmente para evitar errores de PDO::FETCH_GROUP
-$all = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo') ORDER BY materia ASC, fecha DESC")->fetchAll(PDO::FETCH_ASSOC);
+// Filtramos por usuario_id en la consulta principal
+$all = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo') AND usuario_id = $user_id ORDER BY materia ASC, fecha DESC")->fetchAll(PDO::FETCH_ASSOC); // <--- SEGURIDAD
+
 $registros = [];
 foreach($all as $row) {
     $registros[$row['materia']][] = $row;

@@ -1,4 +1,10 @@
 <?php
+session_start();
+if (!isset($_SESSION['usuario_id'])) {
+    header("Location: login.php");
+    exit();
+}
+$user_id = $_SESSION['usuario_id'];
 require_once 'config/database.php';
 require_once 'src/Models/horario.php';
 

@@ -1,4 +1,10 @@
 <?php
+session_start();
+if (!isset($_SESSION['usuario_id'])) {
+    header("Location: login.php");
+    exit();
+}
+$user_id = $_SESSION['usuario_id'];
 require_once 'config/database.php';
 $database = new Database();
 $db = $database->getConnection();
@@ -13,23 +19,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $n_est = !empty($_POST['nota_estimada']) ? $_POST['nota_estimada'] : NULL;
         $n_sac = !empty($_POST['nota_sacada']) ? $_POST['nota_sacada'] : NULL;
 
-        $stmt = $db->prepare("INSERT INTO examenes (materia, fecha, tipo, anotaciones, nota_estimada, nota_sacada, completado) VALUES (?, ?, ?, ?, ?, ?, 0)");
-        $stmt->execute([$materia, $fecha, $tipo, $anot, $n_est, $n_sac]);
+        $stmt = $db->prepare("INSERT INTO examenes (materia, fecha, tipo, anotaciones, nota_estimada, nota_sacada, usuario_id, completado) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
+        $stmt->execute([$materia, $fecha, $tipo, $anot, $n_est, $n_sac, $user_id]);
         header("Location: index.php"); exit;
     }
 }
 
-// Acciones rápidas
-if(isset($_GET['toggle'])) { $db->query("UPDATE examenes SET completado = 1 - completado WHERE id = ".(int)$_GET['toggle']); header("Location: index.php"); exit; }
-if(isset($_GET['del'])) { $db->query("DELETE FROM examenes WHERE id = ".(int)$_GET['del']); header("Location: index.php"); exit; }
+// --- ACCIONES RÁPIDAS (SEGURIZADAS) ---
+if(isset($_GET['toggle'])) { 
+    $stmt = $db->prepare("UPDATE examenes SET completado = 1 - completado WHERE id = ? AND usuario_id = ?");
+    $stmt->execute([(int)$_GET['toggle'], $user_id]);
+    header("Location: index.php"); exit; 
+}
+
+if(isset($_GET['del'])) { 
+    $stmt = $db->prepare("DELETE FROM examenes WHERE id = ? AND usuario_id = ?");
+    $stmt->execute([(int)$_GET['del'], $user_id]);
+    header("Location: index.php"); exit; 
+}
 
 // --- CARGA DE DATOS ---
 $dias_trad = ['Monday'=>'Lunes','Tuesday'=>'Martes','Wednesday'=>'Miércoles','Thursday'=>'Jueves','Friday'=>'Viernes','Saturday'=>'Sábado','Sunday'=>'Domingo'];
 $hoy_nom = $dias_trad[date('l')];
 
-$clases = $db->query("SELECT * FROM horarios WHERE dia_semana = '$hoy_nom' ORDER BY hora_inicio ASC")->fetchAll(PDO::FETCH_ASSOC);
-$tareas = $db->query("SELECT * FROM examenes WHERE tipo = 'Tarea' ORDER BY completado ASC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
-$examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo') AND fecha >= CURDATE() ORDER BY fecha ASC")->fetchAll(PDO::FETCH_ASSOC);
+$clases = $db->query("SELECT * FROM horarios WHERE dia_semana = '$hoy_nom' AND usuario_id = $user_id ORDER BY hora_inicio ASC")->fetchAll(PDO::FETCH_ASSOC);
+$tareas = $db->query("SELECT * FROM examenes WHERE tipo = 'Tarea' AND usuario_id = $user_id ORDER BY completado ASC")->fetchAll();
+$examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo') AND fecha >= CURDATE() AND usuario_id = $user_id ORDER BY fecha ASC")->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -37,7 +52,9 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UniMa | Lucia P</title>
+    <title>UniMa | Gestión Universitaria</title>
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -45,25 +62,30 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
         .card-u { background: white; border-radius: 24px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); margin-bottom: 20px; border: none; }
         .fw-800 { font-weight: 800; }
         .text-primary-u { color: #4338ca !important; }
-        
         .hub-link { background: #4338ca; color: white; padding: 15px; border-radius: 15px; text-decoration: none; font-weight: 700; display: block; text-align: center; transition: 0.2s; }
         .hub-link:hover { background: #3730a3; color: white; transform: translateY(-2px); }
-
         .cd-card { background: #1e293b; color: white; border-radius: 18px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .timer-unit { text-align: center; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 8px; min-width: 50px; margin-left: 5px; }
         .timer-val { display: block; font-size: 1rem; font-weight: 800; }
         .timer-label { font-size: 0.5rem; text-transform: uppercase; opacity: 0.6; }
-
         .bus-badge { background: #eef2ff; color: #4338ca; padding: 3px 8px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; margin: 2px; display: inline-block; }
     </style>
 </head>
 <body class="p-3 p-md-4">
 <div class="container">
     
-    <div class="row mb-4">
-        <div class="col-12 text-center">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
             <h1 class="fw-800 text-primary-u mb-0">UniMa 🚀</h1>
-            <p class="text-muted small mb-3">UJI - La Vall d'Uixó</p>
+            <p class="text-muted small mb-0">¡Hola, <?= htmlspecialchars($_SESSION['nombre'] ?? 'Estudiante') ?>!</p>
+        </div>
+        <a href="logout.php" class="btn btn-light rounded-pill shadow-sm text-danger fw-bold">
+            <i class="bi bi-box-arrow-right"></i> Salir
+        </a>
+    </div>
+
+    <div class="row mb-4 text-center">
+        <div class="col-12">
             <a href="https://share.google/JlpEPhzMBl4ICS4uU" target="_blank" class="hub-link shadow-sm">🎓 ENTRAR AL AULA VIRTUAL</a>
         </div>
     </div>
@@ -93,7 +115,7 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
             <?php foreach($examenes as $ex): ?>
                 <div class="cd-card">
                     <div>
-                        <h6 class="fw-800 mb-0" style="font-size: 0.9rem;"><?= $ex['materia'] ?></h6>
+                        <h6 class="fw-800 mb-0" style="font-size: 0.9rem;"><?= htmlspecialchars($ex['materia']) ?></h6>
                         <small class="opacity-75" style="font-size: 0.7rem;"><?= $ex['tipo'] ?> - <?= date('d/m', strtotime($ex['fecha'])) ?></small>
                     </div>
                     <div class="d-flex countdown-engine" data-date="<?= $ex['fecha'] ?>T09:00:00">
@@ -113,7 +135,7 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
                             <div class="fw-bold text-primary-u small"><?= substr($c['hora_inicio'],0,5) ?></div>
                             <div class="text-muted" style="font-size: 0.6rem;"><?= substr($c['hora_fin'],0,5) ?></div>
                         </div>
-                        <div><div class="fw-bold small"><?= $c['materia'] ?></div><small class="text-muted small">Aula <?= $c['aula'] ?></small></div>
+                        <div><div class="fw-bold small"><?= htmlspecialchars($c['materia']) ?></div><small class="text-muted small">Aula <?= htmlspecialchars($c['aula']) ?></small></div>
                     </div>
                 <?php endforeach; else: ?>
                     <p class="text-muted small">Sin clases hoy.</p>
@@ -133,9 +155,9 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
                     <div class="d-flex justify-content-between align-items-center mb-2 small">
                         <div>
                             <a href="?toggle=<?= $t['id'] ?>" class="btn btn-sm p-0 me-2"><?= $t['completado']?'🟢':'⚪' ?></a>
-                            <span class="<?= $t['completado']?'text-decoration-line-through opacity-50':'' ?>"><?= $t['materia'] ?></span>
+                            <span class="<?= $t['completado']?'text-decoration-line-through opacity-50':'' ?>"><?= htmlspecialchars($t['materia']) ?></span>
                         </div>
-                        <a href="?del=<?= $t['id'] ?>" class="text-danger opacity-25">✕</a>
+                        <a href="?del=<?= $t['id'] ?>" class="text-danger opacity-25" onclick="return confirm('¿Borrar tarea?')">✕</a>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -165,7 +187,7 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
 
 <div class="modal fade" id="addT" tabindex="-1"><div class="modal-dialog"><div class="modal-content p-4 rounded-4 border-0 shadow">
     <h5 class="fw-800 mb-3 text-center">Nueva Tarea</h5>
-    <form method="POST"><input type="hidden" name="tipo" value="Tarea"><input type="text" name="materia" class="form-control mb-3 rounded-pill" placeholder="¿Qué hay que hacer?" required><button type="submit" class="btn btn-primary w-100 rounded-pill">Añadir</button></form>
+    <form method="POST"><input type="hidden" name="tipo" value="Tarea"><input type="text" name="materia" class="form-control mb-3 rounded-pill" placeholder="¿Qué hay que hacer?" required><button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">Añadir</button></form>
 </div></div></div>
 
 <script>
@@ -176,7 +198,6 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
             const target = new Date(targetStr).getTime();
             const now = new Date().getTime();
             const diff = target - now;
-
             if (diff > 0) {
                 timer.querySelector('.days').innerText = Math.floor(diff / (1000 * 60 * 60 * 24));
                 timer.querySelector('.hours').innerText = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));

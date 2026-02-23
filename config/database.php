@@ -1,4 +1,10 @@
 <?php
+session_start();
+if (!isset($_SESSION['usuario_id'])) {
+    header("Location: login.php");
+    exit();
+}
+$user_id = $_SESSION['usuario_id'];
 class Database {
     private $host;
     private $db_name;
