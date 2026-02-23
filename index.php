@@ -62,6 +62,7 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
         .bg-examen { background: #fee2e2; color: #ef4444; }
         .bg-trabajo { background: #e0f2fe; color: #0ea5e9; }
         .text-primary-u { color: #4338ca !important; }
+        .time-box { border-right: 2px solid #e2e8f0; padding-right: 15px; margin-right: 15px; min-width: 70px; text-align: center; }
     </style>
 </head>
 <body class="p-4">
@@ -100,11 +101,17 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
                 <h5 class="fw-800 mb-4">Agenda de hoy (<?= $hoy ?>)</h5>
                 <?php if($clases): foreach($clases as $c): ?>
                     <div class="d-flex align-items-center mb-3 p-3 bg-light rounded-4 border-start border-primary border-4" style="border-color: #4338ca !important;">
-                        <div class="fw-bold me-4 text-primary-u"><?= substr($c['hora_inicio'],0,5) ?></div>
-                        <div><div class="fw-bold"><?= $c['materia'] ?></div><small class="text-muted">📍 Aula <?= $c['aula'] ?></small></div>
+                        <div class="time-box">
+                            <div class="fw-bold text-primary-u" style="font-size: 1.1rem; line-height: 1;"><?= substr($c['hora_inicio'],0,5) ?></div>
+                            <div class="text-muted" style="font-size: 0.7rem; margin-top: 4px;"><?= substr($c['hora_fin'],0,5) ?></div>
+                        </div>
+                        <div>
+                            <div class="fw-bold"><?= $c['materia'] ?></div>
+                            <small class="text-muted">📍 Aula <?= $c['aula'] ?></small>
+                        </div>
                     </div>
                 <?php endforeach; else: ?>
-                    <p class="text-muted small">Sin clases hoy. ¡Tiempo de estudio!</p>
+                    <p class="text-muted small">Sin clases hoy. ¡Aprovecha el tiempo!</p>
                 <?php endif; ?>
             </div>
         </div>
