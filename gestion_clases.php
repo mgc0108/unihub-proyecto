@@ -2,63 +2,81 @@
 require_once 'config/database.php';
 $db = (new Database())->getConnection();
 
-if(isset($_POST['add_clase'])) {
-    $stmt = $db->prepare("INSERT INTO horarios (dia_semana, materia, hora_inicio, aula) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['aula']]);
-}
-if(isset($_GET['del'])) {
-    $db->query("DELETE FROM horarios WHERE id = " . (int)$_GET['del']);
+$edit_clase = null;
+if(isset($_GET['edit'])) {
+    $stmt = $db->prepare("SELECT * FROM horarios WHERE id = ?");
+    $stmt->execute([$_GET['edit']]);
+    $edit_clase = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-$dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+if(isset($_POST['save_clase'])) {
+    if(!empty($_POST['id'])) {
+        $stmt = $db->prepare("UPDATE horarios SET dia_semana=?, materia=?, hora_inicio=?, aula=? WHERE id=?");
+        $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['aula'], $_POST['id']]);
+    } else {
+        $stmt = $db->prepare("INSERT INTO horarios (dia_semana, materia, hora_inicio, aula) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['aula']]);
+    }
+    header("Location: gestion_clases.php"); exit;
+}
+
+if(isset($_GET['del'])) { $db->query("DELETE FROM horarios WHERE id = ".(int)$_GET['del']); header("Location: gestion_clases.php"); exit; }
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <title>Gestionar Horario Semanal</title>
+    <title>UniMa | Gestión Horario</title>
 </head>
 <body class="bg-light p-4">
-    <div class="container bg-white p-4 rounded-4 shadow-sm">
+    <div class="container bg-white p-4 rounded-4 shadow-sm" style="max-width: 900px;">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h3>⚙️ Gestión del Horario Semanal</h3>
-            <a href="index.php" class="btn btn-outline-secondary">⬅️ Volver al Inicio</a>
+            <h3 class="fw-bold"><?= $edit_clase ? '✏️ Modificar Clase' : '📅 Añadir al Horario' ?></h3>
+            <a href="index.php" class="btn btn-outline-dark btn-sm rounded-pill">Volver a UniMa</a>
         </div>
         
-        <form method="POST" class="row g-3 mb-5 border p-3 rounded">
+        <form method="POST" class="row g-3 mb-5 p-3 bg-light rounded-4">
+            <input type="hidden" name="id" value="<?= $edit_clase['id'] ?? '' ?>">
             <div class="col-md-3">
-                <select name="dia" class="form-select"><?php foreach($dias as $d) echo "<option>$d</option>"; ?></select>
+                <label class="small fw-bold">Día</label>
+                <select name="dia" class="form-select">
+                    <?php foreach(['Lunes','Martes','Miércoles','Jueves','Viernes'] as $d) : ?>
+                        <option <?= ($edit_clase['dia_semana'] ?? '') == $d ? 'selected' : '' ?>><?= $d ?></option>
+                    <?php endforeach; ?>
+                </select>
             </div>
-            <div class="col-md-3">
-                <input type="text" name="materia" class="form-control" placeholder="Asignatura" required>
-            </div>
-            <div class="col-md-3">
-                <input type="time" name="hora" class="form-control" required>
-            </div>
-            <div class="col-md-2">
-                <input type="text" name="aula" class="form-control" placeholder="Aula">
-            </div>
-            <div class="col-md-1">
-                <button type="submit" name="add_clase" class="btn btn-primary w-100">+</button>
+            <div class="col-md-3"><label class="small fw-bold">Materia</label><input type="text" name="materia" class="form-control" value="<?= $edit_clase['materia'] ?? '' ?>" required></div>
+            <div class="col-md-2"><label class="small fw-bold">Hora</label><input type="time" name="hora" class="form-control" value="<?= $edit_clase['hora_inicio'] ?? '' ?>" required></div>
+            <div class="col-md-2"><label class="small fw-bold">Aula</label><input type="text" name="aula" class="form-control" value="<?= $edit_clase['aula'] ?? '' ?>"></div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" name="save_clase" class="btn btn-primary w-100"><?= $edit_clase ? 'Actualizar' : 'Añadir' ?></button>
             </div>
         </form>
 
-        <?php foreach($dias as $d): ?>
-            <h5 class="text-primary mt-3 border-bottom pb-2"><?= $d ?></h5>
-            <div class="row mb-3">
-                <?php 
-                $res = $db->query("SELECT * FROM horarios WHERE dia_semana = '$d' ORDER BY hora_inicio");
-                while($h = $res->fetch(PDO::FETCH_ASSOC)): ?>
-                    <div class="col-md-4 mb-2">
-                        <div class="p-2 border rounded d-flex justify-content-between align-items-center bg-white">
-                            <span><b><?= substr($h['hora_inicio'],0,5) ?></b> - <?= $h['materia'] ?></span>
-                            <a href="?del=<?= $h['id'] ?>" class="text-danger text-decoration-none px-2">✕</a>
-                        </div>
-                    </div>
-                <?php endwhile; ?>
-            </div>
-        <?php endforeach; ?>
+        <h5 class="fw-bold mb-3 text-muted">Horario Actual</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark"><tr><th>Día</th><th>Hora</th><th>Materia</th><th>Aula</th><th class="text-center">Acciones</th></tr></thead>
+                <tbody>
+                    <?php 
+                    $res = $db->query("SELECT * FROM horarios ORDER BY FIELD(dia_semana, 'Lunes','Martes','Miércoles','Jueves','Viernes'), hora_inicio ASC");
+                    while($row = $res->fetch(PDO::FETCH_ASSOC)): ?>
+                    <tr>
+                        <td><b><?=$row['dia_semana']?></b></td>
+                        <td><?=substr($row['hora_inicio'],0,5)?></td>
+                        <td><?=$row['materia']?></td>
+                        <td><span class="badge bg-secondary"><?=$row['aula']?></span></td>
+                        <td class="text-center">
+                            <a href="?edit=<?=$row['id']?>" class="btn btn-sm btn-warning">Editar</a>
+                            <a href="?del=<?=$row['id']?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Borrar?')">✕</a>
+                        </td>
+                    </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 </body>
 </html>
