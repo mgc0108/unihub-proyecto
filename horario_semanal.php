@@ -5,7 +5,9 @@ require_once 'src/Models/horario.php';
 $database = new Database();
 $db = $database->getConnection();
 $horarioModel = new Horario($db);
-$todas_las_clases = $horarioModel->obtenerTodos(); // Asegúrate de tener este método
+
+// Obtenemos todas las clases de la base de datos
+$todas_las_clases = $horarioModel->obtenerTodos(); 
 
 $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 ?>
@@ -13,34 +15,48 @@ $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Horario Semanal | UniHub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horario Completo | UniHub</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .grid-horario { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-        .clase-card { background: #e0e7ff; border-radius: 10px; padding: 10px; font-size: 0.8rem; margin-bottom: 5px; }
+        body { background-color: #f0f2f5; font-family: 'Plus Jakarta Sans', sans-serif; }
+        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; padding: 20px; }
+        .dia-col { background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); height: fit-content; }
+        .dia-titulo { color: #4338ca; font-weight: 800; text-align: center; margin-bottom: 15px; border-bottom: 2px solid #eef2ff; pb-2; }
+        .clase-card { background: #f8faff; border-left: 4px solid #4338ca; border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+        .clase-materia { font-weight: 700; font-size: 0.9rem; display: block; }
+        .clase-info { font-size: 0.75rem; color: #6b7280; }
     </style>
 </head>
-<body class="bg-light">
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold">Vista Semanal 📅</h2>
-        <a href="index.php" class="btn btn-dark">Cerrar</a>
-    </div>
-    <div class="grid-horario">
-        <?php foreach($dias as $dia): ?>
-            <div class="dia-col">
-                <h6 class="text-center fw-bold bg-white p-2 rounded-3 shadow-sm"><?= $dia ?></h6>
-                <?php foreach($todas_las_clases as $c): ?>
-                    <?php if($c['dia_semana'] == $dia): ?>
-                        <div class="clase-card shadow-sm border-start border-4 border-primary">
-                            <strong><?= $c['materia'] ?></strong><br>
-                            <span class="text-muted small"><?= substr($c['hora_inicio'], 0, 5) ?> - <?= $c['aula'] ?></span>
+<body>
+    <div class="container-fluid py-4">
+        <div class="d-flex justify-content-between align-items-center px-3 mb-4">
+            <h2 class="fw-bold mb-0">Mi Semana 📅</h2>
+            <a href="index.php" class="btn btn-outline-dark rounded-pill">Volver</a>
+        </div>
+
+        <div class="grid-container">
+            <?php foreach($dias as $dia): ?>
+                <div class="dia-col">
+                    <h6 class="dia-titulo"><?= $dia ?></h6>
+                    <?php 
+                    $hay_clase = false;
+                    foreach($todas_las_clases as $c): 
+                        if($c['dia_semana'] == $dia): 
+                            $hay_clase = true;
+                    ?>
+                        <div class="clase-card">
+                            <span class="clase-materia"><?= $c['materia'] ?></span>
+                            <span class="clase-info">🕒 <?= substr($c['hora_inicio'], 0, 5) ?> | 📍 <?= $c['aula'] ?></span>
                         </div>
-                    <?php endif; ?>
-                <?php endforeach; ?>
-            </div>
-        <?php endforeach; ?>
+                    <?php 
+                        endif;
+                    endforeach; 
+                    if(!$hay_clase) echo '<p class="text-center text-muted small">Sin clases</p>';
+                    ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
     </div>
-</div>
 </body>
 </html>
