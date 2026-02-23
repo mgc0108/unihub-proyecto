@@ -5,14 +5,11 @@ $db = $database->getConnection();
 
 // --- LÓGICA DE PROCESAMIENTO (POST) ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // 1. ACTUALIZAR NOTA REAL
     if (isset($_POST['update_nota'])) {
         $stmt = $db->prepare("UPDATE examenes SET nota_sacada = ? WHERE id = ?");
         $stmt->execute([$_POST['nota_sacada'], $_POST['examen_id']]);
         header("Location: index.php"); exit;
     }
-    
-    // 2. REGISTRO NUEVO (TAREA, EXAMEN O TRABAJO)
     if (isset($_POST['materia'])) {
         $tipo = $_POST['tipo'] ?? 'Tarea';
         $materia = $_POST['materia'];
@@ -32,7 +29,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 if(isset($_GET['toggle'])) { $db->query("UPDATE examenes SET completado = 1 - completado WHERE id = ".(int)$_GET['toggle']); header("Location: index.php"); exit; }
 if(isset($_GET['del'])) { $db->query("DELETE FROM examenes WHERE id = ".(int)$_GET['del']); header("Location: index.php"); exit; }
 
-// --- CARGA DE DATOS ---
 $dias_trad = ['Monday'=>'Lunes','Tuesday'=>'Martes','Wednesday'=>'Miércoles','Thursday'=>'Jueves','Friday'=>'Viernes','Saturday'=>'Sábado','Sunday'=>'Domingo'];
 $hoy = $dias_trad[date('l')];
 
@@ -63,6 +59,9 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
         .bg-trabajo { background: #e0f2fe; color: #0ea5e9; }
         .text-primary-u { color: #4338ca !important; }
         .time-box { border-right: 2px solid #e2e8f0; padding-right: 15px; margin-right: 15px; min-width: 70px; text-align: center; }
+        .anotacion-preview { font-size: 0.75rem; color: #64748b; background: #f1f5f9; padding: 8px; border-radius: 10px; margin-top: 10px; display: none; }
+        .clickable-title { cursor: pointer; transition: 0.2s; }
+        .clickable-title:hover { color: #4338ca; }
     </style>
 </head>
 <body class="p-4">
@@ -72,7 +71,10 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
             <h1 class="fw-800 mb-0 text-primary-u" style="letter-spacing: -1.5px;">UniMa 🚀</h1>
             <p class="text-muted small fw-600 mb-0">UJI - Lucia P</p>
         </div>
-        <a href="gestion_clases.php" class="btn btn-dark rounded-pill px-4 shadow-sm">⚙️ Gestionar Clases</a>
+        <div class="d-flex gap-2">
+            <a href="gestion_evaluables.php" class="btn btn-outline-primary rounded-pill px-4 shadow-sm fw-bold">📝 Notas y Trabajos</a>
+            <a href="gestion_clases.php" class="btn btn-dark rounded-pill px-4 shadow-sm">⚙️ Horario</a>
+        </div>
     </header>
 
     <div class="row g-4">
@@ -82,17 +84,13 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
                 <div class="row small text-center">
                     <div class="col-6 pe-1">
                         <span class="fw-bold d-block mb-2 text-muted" style="font-size: 0.7rem;">➡️ IDA (Desde La Vall)</span>
-                        <?php 
-                        $ida = ['06:40', '07:50', '09:10', '09:50', '10:50', '11:50', '12:50', '13:45', '15:00', '15:50', '16:30', '17:40', '18:30', '19:45', '20:40']; 
-                        foreach($ida as $h) echo "<span class='bus-badge'>$h</span>"; 
-                        ?>
+                        <?php $ida = ['06:40', '07:50', '09:10', '09:50', '10:50', '11:50', '12:50', '13:45', '15:00', '15:50', '16:30', '17:40', '18:30', '19:45', '20:40']; 
+                        foreach($ida as $h) echo "<span class='bus-badge'>$h</span>"; ?>
                     </div>
                     <div class="col-6 ps-1 border-start">
                         <span class="fw-bold d-block mb-2 text-muted" style="font-size: 0.7rem;">⬅️ VUELTA (Desde UJI)</span>
-                        <?php 
-                        $vta = ['07:50', '09:05', '10:25', '11:15', '12:05', '13:05', '14:05', '15:00', '16:15', '17:05', '17:45', '19:00', '19:50', '21:00', '22:00']; 
-                        foreach($vta as $h) echo "<span class='bus-badge text-danger' style='background:#fff1f2;'>$h</span>"; 
-                        ?>
+                        <?php $vta = ['07:50', '09:05', '10:25', '11:15', '12:05', '13:05', '14:05', '15:00', '16:15', '17:05', '17:45', '19:00', '19:50', '21:00', '22:00']; 
+                        foreach($vta as $h) echo "<span class='bus-badge text-danger' style='background:#fff1f2;'>$h</span>"; ?>
                     </div>
                 </div>
             </div>
@@ -105,13 +103,10 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
                             <div class="fw-bold text-primary-u" style="font-size: 1.1rem; line-height: 1;"><?= substr($c['hora_inicio'],0,5) ?></div>
                             <div class="text-muted" style="font-size: 0.7rem; margin-top: 4px;"><?= substr($c['hora_fin'],0,5) ?></div>
                         </div>
-                        <div>
-                            <div class="fw-bold"><?= $c['materia'] ?></div>
-                            <small class="text-muted">📍 Aula <?= $c['aula'] ?></small>
-                        </div>
+                        <div><div class="fw-bold"><?= $c['materia'] ?></div><small class="text-muted">📍 Aula <?= $c['aula'] ?></small></div>
                     </div>
                 <?php endforeach; else: ?>
-                    <p class="text-muted small">Sin clases hoy. ¡Aprovecha el tiempo!</p>
+                    <p class="text-muted small">Sin clases hoy.</p>
                 <?php endif; ?>
             </div>
         </div>
@@ -119,8 +114,8 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
         <div class="col-lg-5">
             <div class="card-u bg-success text-white">
                 <small class="fw-bold opacity-75">MENÚ UJI</small>
-                <h5 class="fw-800 mb-3">Consultar Cafetería</h5>
-                <a href="https://ujiapps.uji.es/ade/rest/storage/P4LFVSDOBJDUDE3EQFGR21LJEBWR1W31" target="_blank" class="btn btn-light w-100 fw-bold rounded-pill text-success shadow-sm">📂 Ver PDF de la Semana</a>
+                <h5 class="fw-800 mb-3">Cafetería</h5>
+                <a href="https://ujiapps.uji.es/ade/rest/storage/P4LFVSDOBJDUDE3EQFGR21LJEBWR1W31" target="_blank" class="btn btn-light w-100 fw-bold rounded-pill text-success shadow-sm">📂 Abrir Menú</a>
             </div>
 
             <div class="card-u">
@@ -138,8 +133,15 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
                 <?php foreach($evaluables as $e): ?>
                     <div class="p-3 border rounded-4 mb-3 position-relative bg-light shadow-sm">
                         <span class="badge-tipo <?= $e['tipo'] == 'Examen' ? 'bg-examen' : 'bg-trabajo' ?>"><?= $e['tipo'] ?></span>
-                        <div class="fw-bold small mb-2 text-muted" style="font-size: 0.75rem;"><?= $e['materia'] ?></div>
-                        <div class="row g-2 small text-center align-items-center">
+                        <div class="fw-bold small mb-2 text-muted clickable-title" onclick="toggleAnot(<?= $e['id'] ?>)" style="font-size: 0.75rem;">
+                            <?= $e['materia'] ?> 🔽
+                        </div>
+                        
+                        <div id="anot-<?= $e['id'] ?>" class="anotacion-preview">
+                            <strong>Anotaciones:</strong><br><?= !empty($e['anotaciones']) ? nl2br($e['anotaciones']) : 'Sin notas' ?>
+                        </div>
+
+                        <div class="row g-2 small text-center align-items-center mt-2">
                             <div class="col-5"><span class="d-block opacity-75" style="font-size: 0.6rem;">PREVISTA</span><b><?= $e['nota_estimada'] ?? '-' ?></b></div>
                             <div class="col-2 text-muted">→</div>
                             <div class="col-5">
@@ -165,21 +167,26 @@ $evaluables = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Traba
 </div>
 
 <div class="modal fade" id="addT" tabindex="-1"><div class="modal-dialog"><div class="modal-content p-4 rounded-4 shadow border-0 text-center">
-    <h5 class="fw-800 mb-3">Nueva Tarea</h5><form method="POST"><input type="hidden" name="tipo" value="Tarea"><input type="text" name="materia" class="form-control mb-3" placeholder="Descripción..." required><button type="submit" class="btn btn-primary w-100 rounded-pill">Añadir</button></form>
+    <h5 class="fw-800 mb-3">Nueva Tarea</h5><form method="POST"><input type="hidden" name="tipo" value="Tarea"><input type="text" name="materia" class="form-control mb-3" required><button type="submit" class="btn btn-primary w-100 rounded-pill">Añadir</button></form>
 </div></div></div>
 
 <div class="modal fade" id="addE" tabindex="-1"><div class="modal-dialog"><div class="modal-content p-4 rounded-4 shadow border-0">
     <h5 class="fw-800 mb-3 text-center">Nuevo Registro</h5>
     <form method="POST">
-        <label class="small fw-bold text-muted">Tipo</label>
-        <select name="tipo" class="form-select mb-3 rounded-pill"><option value="Examen">Examen</option><option value="Trabajo">Trabajo / Práctica</option></select>
-        <label class="small fw-bold text-muted">Asignatura</label><input type="text" name="materia" class="form-control mb-3 rounded-pill" required>
-        <div class="row"><div class="col-6"><label class="small fw-bold text-muted">Fecha</label><input type="date" name="fecha" class="form-control mb-3 rounded-pill"></div><div class="col-6"><label class="small fw-bold text-muted">Nota Prevista</label><input type="number" step="0.1" name="nota_estimada" class="form-control mb-3 rounded-pill" placeholder="0.0"></div></div>
-        <label class="small fw-bold text-muted">Notas adicionales</label><textarea name="anotaciones" class="form-control mb-3" style="border-radius: 15px;"></textarea>
+        <select name="tipo" class="form-select mb-3 rounded-pill"><option value="Examen">Examen</option><option value="Trabajo">Trabajo</option></select>
+        <input type="text" name="materia" class="form-control mb-3 rounded-pill" placeholder="Asignatura" required>
+        <div class="row"><div class="col-6"><input type="date" name="fecha" class="form-control mb-3 rounded-pill"></div><div class="col-6"><input type="number" step="0.1" name="nota_estimada" class="form-control mb-3 rounded-pill" placeholder="Nota Prev."></div></div>
+        <textarea name="anotaciones" class="form-control mb-3" placeholder="Escribe aquí tus anotaciones..." style="border-radius: 15px;"></textarea>
         <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">Registrar</button>
     </form>
 </div></div></div>
 
+<script>
+    function toggleAnot(id) {
+        const el = document.getElementById('anot-' + id);
+        el.style.display = (el.style.display === 'block') ? 'none' : 'block';
+    }
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
