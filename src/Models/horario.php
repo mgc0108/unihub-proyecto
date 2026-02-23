@@ -6,18 +6,20 @@ class Horario {
         $this->db = $db;
     }
 
-    // Obtener clases ordenadas por día y hora
+    // Obtener clases para el día de hoy o semana (la que ya tenías)
     public function obtenerSemana() {
         $query = "SELECT * FROM horarios ORDER BY FIELD(dia_semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'), hora_inicio";
         $stmt = $this->db->prepare($query);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    // Función corregida para la cuadrícula completa
     public function obtenerTodos() {
-    // Esta consulta trae el horario de toda la semana
-    $query = "SELECT * FROM " . $this->table_name . " ORDER BY FIELD(dia_semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'), hora_inicio";
-    $stmt = $this->conn->prepare($query);
-    $stmt->execute();
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
+        // Cambiado $this->table_name por "horarios" y $this->conn por $this->db
+        $query = "SELECT * FROM horarios ORDER BY FIELD(dia_semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'), hora_inicio";
+        $stmt = $this->db->prepare($query);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
