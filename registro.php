@@ -1,27 +1,42 @@
 <?php
-session_start();
+// 1. CARGAMOS EL PARCHE DE SEGURIDAD (Desde database.php)
 require_once 'config/database.php';
+
+// Ya no hace falta poner session_start() ni ini_set aquí, 
+// porque database.php ya lo hace por ti al hacer el require.
+
 $database = new Database();
 $db = $database->getConnection();
+
+// Si el usuario ya está logueado, lo mandamos al index para que no cree cuentas estando dentro
+if (isset($_SESSION['usuario_id'])) {
+    header("Location: index.php");
+    exit();
+}
 
 $mensaje = "";
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nombre = $_POST['nombre'];
     $email = $_POST['email'];
-    $password = password_hash($_POST['password'], PASSWORD_BCRYPT); // Ciframos la clave
+    // Validamos que el password no esté vacío
+    if (!empty($_POST['password'])) {
+        $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
 
-    try {
-        $stmt = $db->prepare("INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)");
-        if ($stmt->execute([$nombre, $email, $password])) {
-            $mensaje = "<div class='alert alert-success'>¡Cuenta creada! <a href='login.php'>Inicia sesión aquí</a></div>";
+        try {
+            $stmt = $db->prepare("INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)");
+            if ($stmt->execute([$nombre, $email, $password])) {
+                $mensaje = "<div class='alert alert-success'>¡Cuenta creada con éxito! <a href='login.php' class='fw-bold'>Inicia sesión aquí</a></div>";
+            }
+        } catch (PDOException $e) {
+            if ($e->getCode() == 23000) { 
+                $mensaje = "<div class='alert alert-danger'>Este email ya está registrado.</div>";
+            } else {
+                $mensaje = "<div class='alert alert-danger'>Error en el servidor. Inténtalo más tarde.</div>";
+            }
         }
-    } catch (PDOException $e) {
-        if ($e->getCode() == 23000) { // Error de duplicado
-            $mensaje = "<div class='alert alert-danger'>Este email ya está registrado.</div>";
-        } else {
-            $mensaje = "<div class='alert alert-danger'>Error al registrar: " . $e->getMessage() . "</div>";
-        }
+    } else {
+        $mensaje = "<div class='alert alert-warning'>Por favor, completa todos los campos.</div>";
     }
 }
 ?>
