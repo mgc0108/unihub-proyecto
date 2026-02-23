@@ -1,6 +1,5 @@
 <?php
-// 1. SOLUCIÓN PARA BUCLES EN CLEVER CLOUD
-// Esto le dice a PHP que confíe en el protocolo HTTPS del servidor de Clever Cloud
+// --- SOLUCIÓN PARA BUCLES EN CLEVER CLOUD ---
 if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') {
     $_SERVER['HTTPS'] = 'on';
 }
@@ -11,17 +10,17 @@ ini_set('session.cookie_secure', 1);
 
 session_start();
 
-// 2. CONTROL DE ACCESO (EL PORTERO)
+// Control de acceso
 if (!isset($_SESSION['usuario_id']) || empty($_SESSION['usuario_id'])) {
     header("Location: login.php");
-    exit(); // Obligatorio para detener el bucle
+    exit(); 
 }
 
 $user_id = $_SESSION['usuario_id'];
 require_once 'config/database.php';
 $db = (new Database())->getConnection();
 
-// --- 3. LÓGICA DE PROCESAMIENTO (POST) ---
+// --- LÓGICA DE PROCESAMIENTO (POST) ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['materia'])) {
     $tipo = $_POST['tipo'] ?? 'Examen';
     $materia = $_POST['materia'];
@@ -37,22 +36,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['materia'])) {
     exit();
 }
 
-// --- 4. ACCIONES RÁPIDAS ---
+// --- ACCIONES RÁPIDAS ---
 if(isset($_GET['toggle'])) { 
     $stmt = $db->prepare("UPDATE examenes SET completado = 1 - completado WHERE id = ? AND usuario_id = ?");
     $stmt->execute([(int)$_GET['toggle'], $user_id]);
-    header("Location: index.php"); 
-    exit(); 
+    header("Location: index.php"); exit(); 
 }
 
 if(isset($_GET['del'])) { 
     $stmt = $db->prepare("DELETE FROM examenes WHERE id = ? AND usuario_id = ?");
     $stmt->execute([(int)$_GET['del'], $user_id]);
-    header("Location: index.php"); 
-    exit(); 
+    header("Location: index.php"); exit(); 
 }
 
-// --- 5. CARGA DE DATOS ---
+// --- CARGA DE DATOS ---
 $dias_trad = ['Monday'=>'Lunes','Tuesday'=>'Martes','Wednesday'=>'Miércoles','Thursday'=>'Jueves','Friday'=>'Viernes','Saturday'=>'Sábado','Sunday'=>'Domingo'];
 $hoy_nom = $dias_trad[date('l')];
 

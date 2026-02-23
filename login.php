@@ -1,5 +1,5 @@
 <?php
-// SOLUCIÓN PARA BUCLES
+// --- SOLUCIÓN PARA BUCLES EN CLEVER CLOUD ---
 if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') {
     $_SERVER['HTTPS'] = 'on';
 }
@@ -8,7 +8,7 @@ ini_set('session.cookie_secure', 1);
 ini_set('session.cookie_httponly', 1);
 session_start();
 
-// Si ya tiene sesión, no lo dejes entrar al login, mándalo al index
+// Si ya tiene sesión, mandamos al index
 if (isset($_SESSION['usuario_id'])) {
     header("Location: index.php");
     exit();
