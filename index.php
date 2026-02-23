@@ -102,7 +102,26 @@ $hoy_texto = $dias_traducidos[date('l')];
     </style>
 </head>
 <body>
-
+<div class="main-container mt-4">
+    <h5 class="fw-bold mb-3">📌 No olvidar...</h5>
+    <div class="list-group list-group-flush">
+        <div class="list-group-item bg-transparent border-0 d-flex align-items-center">
+            <input class="form-check-input me-3" type="checkbox">
+            <span>Llevar tijeras y pegamento</span>
+        </div>
+    </div>
+</div>
+<div class="main-container bg-primary text-white mb-4">
+    <h6 class="fw-bold mb-3">🚌 Próximos Buses (L11 / TRAM)</h6>
+    <div class="d-flex overflow-auto gap-2 pb-2" style="scrollbar-width: none;">
+        <span class="badge bg-white text-primary p-2">07:30</span>
+        <span class="badge bg-white text-primary p-2">08:00</span>
+        <span class="badge bg-white text-primary p-2">08:30</span>
+        <span class="badge bg-white text-primary p-2">09:00</span>
+        <span class="badge bg-white text-primary p-2">...cada 30 min</span>
+    </div>
+    <small class="opacity-75">Última salida: 22:00h</small>
+</div>
 <div class="container py-4">
     <header class="mb-4 d-flex justify-content-between align-items-center">
         <div>
@@ -149,7 +168,10 @@ $hoy_texto = $dias_traducidos[date('l')];
             </div>
         </div>
     </div>
-
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h5 class="fw-bold mb-0">Agenda del día</h5>
+    <a href="horario_semanal.php" class="btn btn-sm btn-outline-primary rounded-pill">Ver semana completa →</a>
+</div>
     <div class="row g-4">
         <div class="col-12 col-lg-7">
             <div class="main-container h-100">
