@@ -1,44 +1,56 @@
 <?php
+// 1. SEGURIDAD DE SESIÓN (Para evitar el bucle de redirecciones)
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_only_cookies', 1);
+ini_set('session.cookie_secure', 1); 
+
 session_start();
+
+// 2. CONTROL DE ACCESO
 if (!isset($_SESSION['usuario_id'])) {
     header("Location: login.php");
     exit();
 }
-$user_id = $_SESSION['usuario_id']; // <--- Aquí guardamos quién eres
+
+$user_id = $_SESSION['usuario_id'];
 require_once 'config/database.php';
 $db = (new Database())->getConnection();
 
+// --- LÓGICA DE EDICIÓN (Cargar datos en el formulario) ---
 $edit_clase = null;
 if(isset($_GET['edit'])) {
-    // Añadimos AND usuario_id para que nadie edite clases de otros
-    $stmt = $db->prepare("SELECT * FROM horarios WHERE id = ? AND usuario_id = ?"); // <--- CAMBIO
-    $stmt->execute([$_GET['edit'], $user_id]); // <--- CAMBIO
+    $stmt = $db->prepare("SELECT * FROM horarios WHERE id = ? AND usuario_id = ?");
+    $stmt->execute([$_GET['edit'], $user_id]);
     $edit_clase = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
+// --- LÓGICA DE GUARDAR (Insertar o Actualizar) ---
 if(isset($_POST['save_clase'])) {
     if(!empty($_POST['id'])) {
-        // Al actualizar, verificamos que la clase sea tuya
-        $stmt = $db->prepare("UPDATE horarios SET dia_semana=?, materia=?, hora_inicio=?, hora_fin=?, aula=? WHERE id=? AND usuario_id=?"); // <--- CAMBIO
-        $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['hora_fin'], $_POST['aula'], $_POST['id'], $user_id]); // <--- CAMBIO
+        // Actualizar clase existente
+        $stmt = $db->prepare("UPDATE horarios SET dia_semana=?, materia=?, hora_inicio=?, hora_fin=?, aula=? WHERE id=? AND usuario_id=?");
+        $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['hora_fin'], $_POST['aula'], $_POST['id'], $user_id]);
     } else {
-        // Al insertar, guardamos tu $user_id
-        $stmt = $db->prepare("INSERT INTO horarios (dia_semana, materia, hora_inicio, hora_fin, aula, usuario_id) VALUES (?, ?, ?, ?, ?, ?)"); // <--- CAMBIO
-        $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['hora_fin'], $_POST['aula'], $user_id]); // <--- CAMBIO
+        // Insertar nueva clase
+        $stmt = $db->prepare("INSERT INTO horarios (dia_semana, materia, hora_inicio, hora_fin, aula, usuario_id) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['hora_fin'], $_POST['aula'], $user_id]);
     }
-    header("Location: gestion_clases.php"); exit;
+    header("Location: gestion_clases.php"); 
+    exit();
 }
 
+// --- LÓGICA DE BORRADO ---
 if(isset($_GET['del'])) { 
-    // Al borrar, solo permitimos si el usuario_id coincide
-    $stmt = $db->prepare("DELETE FROM horarios WHERE id = ? AND usuario_id = ?"); // <--- CAMBIO
-    $stmt->execute([(int)$_GET['del'], $user_id]); // <--- CAMBIO
-    header("Location: gestion_clases.php"); exit; 
+    $stmt = $db->prepare("DELETE FROM horarios WHERE id = ? AND usuario_id = ?");
+    $stmt->execute([(int)$_GET['del'], $user_id]);
+    header("Location: gestion_clases.php"); 
+    exit(); 
 }
 
-// IMPORTANTE: Para listar las clases en la tabla, falta la consulta SELECT.
-// Asegúrate de que donde muestras la lista de clases diga esto:
-// $clases = $db->query("SELECT * FROM horarios WHERE usuario_id = $user_id ORDER BY dia_semana, hora_inicio")->fetchAll();
+// --- CARGA DE LA LISTA DE CLASES (Para la tabla inferior) ---
+$stmt_list = $db->prepare("SELECT * FROM horarios WHERE usuario_id = ? ORDER BY FIELD(dia_semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'), hora_inicio ASC");
+$stmt_list->execute([$user_id]);
+$clases = $stmt_list->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>

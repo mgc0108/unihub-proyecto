@@ -1,20 +1,28 @@
 <?php
+ini_set('session.cookie_secure', 1);
+ini_set('session.cookie_httponly', 1);
 session_start();
+
+// Si ya está logueado, lo mandamos al index para que no vuelva a loguearse
+if (isset($_SESSION['usuario_id'])) {
+    header("Location: index.php");
+    exit();
+}
+
 require_once 'config/database.php';
 $database = new Database();
 $db = $database->getConnection();
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Añadimos "nombre" a la consulta SQL
-    $stmt = $db->prepare("SELECT id, nombre, password FROM usuarios WHERE email = ?"); // <--- CAMBIO AQUÍ
+    $stmt = $db->prepare("SELECT id, nombre, password FROM usuarios WHERE email = ?");
     $stmt->execute([$_POST['email']]);
-    $user = $stmt->fetch();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($user && password_verify($_POST['password'], $user['password'])) {
         $_SESSION['usuario_id'] = $user['id'];
-        $_SESSION['nombre'] = $user['nombre']; // <--- GUARDAMOS EL NOMBRE EN LA SESIÓN
+        $_SESSION['nombre'] = $user['nombre'];
         header("Location: index.php");
-        exit; // Siempre es bueno poner exit después de un header
+        exit(); // CRUCIAL
     } else {
         $error = "Email o contraseña incorrectos";
     }

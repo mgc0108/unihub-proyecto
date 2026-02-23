@@ -1,21 +1,21 @@
 <?php
-// 1. CONFIGURACIÓN DE SEGURIDAD PARA SESIONES (Evita bucles de redirección)
+// 1. CONFIGURACIÓN DE SEGURIDAD PARA SESIONES
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', 1); // Obligatorio para HTTPS en Clever Cloud
+ini_set('session.cookie_secure', 1); 
 
 session_start();
 
 // 2. CONTROL DE ACCESO
 if (!isset($_SESSION['usuario_id']) || empty($_SESSION['usuario_id'])) {
     header("Location: login.php");
-    exit(); // Detiene la ejecución aquí si no hay sesión
+    exit(); 
 }
 
+// Si llega aquí es porque SÍ hay sesión
 $user_id = $_SESSION['usuario_id'];
 require_once 'config/database.php';
-$database = new Database();
-$db = $database->getConnection();
+$db = (new Database())->getConnection();
 
 // --- 3. LÓGICA DE PROCESAMIENTO (POST) ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -27,7 +27,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $n_est = !empty($_POST['nota_estimada']) ? $_POST['nota_estimada'] : NULL;
         $n_sac = !empty($_POST['nota_sacada']) ? $_POST['nota_sacada'] : NULL;
 
-        // Guardamos el examen asociado a TU ID de usuario
         $stmt = $db->prepare("INSERT INTO examenes (materia, fecha, tipo, anotaciones, nota_estimada, nota_sacada, usuario_id, completado) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
         $stmt->execute([$materia, $fecha, $tipo, $anot, $n_est, $n_sac, $user_id]);
         
@@ -37,7 +36,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // --- 4. ACCIONES RÁPIDAS (SEGURIZADAS) ---
-// Toggle de completado (solo si el examen es tuyo)
 if(isset($_GET['toggle'])) { 
     $stmt = $db->prepare("UPDATE examenes SET completado = 1 - completado WHERE id = ? AND usuario_id = ?");
     $stmt->execute([(int)$_GET['toggle'], $user_id]);
@@ -45,7 +43,6 @@ if(isset($_GET['toggle'])) {
     exit(); 
 }
 
-// Borrado (solo si el examen es tuyo)
 if(isset($_GET['del'])) { 
     $stmt = $db->prepare("DELETE FROM examenes WHERE id = ? AND usuario_id = ?");
     $stmt->execute([(int)$_GET['del'], $user_id]);
@@ -65,17 +62,14 @@ $dias_trad = [
 ];
 $hoy_nom = $dias_trad[date('l')];
 
-// Consulta de horarios del usuario logueado
 $stmt_clases = $db->prepare("SELECT * FROM horarios WHERE dia_semana = ? AND usuario_id = ? ORDER BY hora_inicio ASC");
 $stmt_clases->execute([$hoy_nom, $user_id]);
 $clases = $stmt_clases->fetchAll(PDO::FETCH_ASSOC);
 
-// Consulta de tareas del usuario logueado
 $stmt_tareas = $db->prepare("SELECT * FROM examenes WHERE tipo = 'Tarea' AND usuario_id = ? ORDER BY completado ASC");
 $stmt_tareas->execute([$user_id]);
 $tareas = $stmt_tareas->fetchAll(PDO::FETCH_ASSOC);
 
-// Consulta de exámenes/trabajos del usuario logueado
 $stmt_examenes = $db->prepare("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo') AND fecha >= CURDATE() AND usuario_id = ? ORDER BY fecha ASC");
 $stmt_examenes->execute([$user_id]);
 $examenes = $stmt_examenes->fetchAll(PDO::FETCH_ASSOC);
