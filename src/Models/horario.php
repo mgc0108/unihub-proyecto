@@ -13,4 +13,11 @@ class Horario {
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+    public function obtenerTodos() {
+    // Esta consulta trae el horario de toda la semana
+    $query = "SELECT * FROM " . $this->table_name . " ORDER BY FIELD(dia_semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'), hora_inicio";
+    $stmt = $this->conn->prepare($query);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 }
