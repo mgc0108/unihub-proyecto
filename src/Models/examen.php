@@ -22,4 +22,10 @@ class Examen {
         $stmt = $this->db->prepare($sql);
         return $stmt->execute([$materia, $fecha, $hora, $tipo]);
     }
+    public function eliminar($id) {
+    $query = "DELETE FROM " . $this->table_name . " WHERE id = :id";
+    $stmt = $this->conn->prepare($query);
+    $stmt->bindParam(':id', $id);
+    return $stmt->execute();
+}
 }

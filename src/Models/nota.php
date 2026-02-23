@@ -18,4 +18,10 @@ class Nota {
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+    public function eliminar($id) {
+    $query = "DELETE FROM " . $this->table_name . " WHERE id = :id";
+    $stmt = $this->conn->prepare($query);
+    $stmt->bindParam(':id', $id);
+    return $stmt->execute();
+}
 }
