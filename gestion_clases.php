@@ -1,18 +1,37 @@
 <?php
-require_once 'config/database.php'; // Esto ya maneja la sesión y el parche HTTPS
-// ... seguridad de acceso ...
+require_once 'config/database.php'; 
+// La sesión y el parche HTTPS ya se cargan desde database.php
+
+if (!isset($_SESSION['usuario_id'])) {
+    header("Location: login.php");
+    exit();
+}
 
 $user_id = $_SESSION['usuario_id'];
 $db = (new Database())->getConnection();
 
-// LÓGICA DE GUARDAR (Asegúrate de que incluya el $user_id)
+// --- LÓGICA DE EDICIÓN (Cargar datos) ---
+$edit_clase = null;
+if(isset($_GET['edit'])) {
+    $stmt = $db->prepare("SELECT * FROM horarios WHERE id = ? AND usuario_id = ?");
+    $stmt->execute([$_GET['edit'], $user_id]);
+    $edit_clase = $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+// --- LÓGICA DE BORRADO ---
+if(isset($_GET['del'])) { 
+    $stmt = $db->prepare("DELETE FROM horarios WHERE id = ? AND usuario_id = ?");
+    $stmt->execute([(int)$_GET['del'], $user_id]);
+    header("Location: gestion_clases.php"); 
+    exit(); 
+}
+
+// --- LÓGICA DE GUARDAR ---
 if(isset($_POST['save_clase'])) {
     if(!empty($_POST['id'])) {
-        // ACTUALIZAR: Solo si te pertenece
         $stmt = $db->prepare("UPDATE horarios SET dia_semana=?, materia=?, hora_inicio=?, hora_fin=?, aula=? WHERE id=? AND usuario_id=?");
         $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['hora_fin'], $_POST['aula'], $_POST['id'], $user_id]);
     } else {
-        // INSERTAR: Guardamos tu ID
         $stmt = $db->prepare("INSERT INTO horarios (dia_semana, materia, hora_inicio, hora_fin, aula, usuario_id) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['hora_fin'], $_POST['aula'], $user_id]);
     }
@@ -20,10 +39,10 @@ if(isset($_POST['save_clase'])) {
     exit();
 }
 
-// LÓGICA DE LISTADO (Para que veas solo las tuyas)
-$res = $db->prepare("SELECT * FROM horarios WHERE usuario_id = ? ORDER BY FIELD(dia_semana, 'Lunes','Martes','Miércoles','Jueves','Viernes'), hora_inicio ASC");
-$res->execute([$user_id]);
-$mis_clases = $res->fetchAll(PDO::FETCH_ASSOC);
+// --- LÓGICA DE LISTADO (Filtrado por tu usuario) ---
+$stmt_list = $db->prepare("SELECT * FROM horarios WHERE usuario_id = ? ORDER BY FIELD(dia_semana, 'Lunes','Martes','Miércoles','Jueves','Viernes'), hora_inicio ASC");
+$stmt_list->execute([$user_id]);
+$mis_clases = $stmt_list->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -64,24 +83,26 @@ $mis_clases = $res->fetchAll(PDO::FETCH_ASSOC);
             <table class="table table-hover align-middle">
                 <thead class="table-dark"><tr><th>Día</th><th>Horario</th><th>Materia</th><th>Aula</th><th class="text-center">Acciones</th></tr></thead>
                 <tbody>
-                    <?php 
-                    $res = $db->query("SELECT * FROM horarios ORDER BY FIELD(dia_semana, 'Lunes','Martes','Miércoles','Jueves','Viernes'), hora_inicio ASC");
-                    while($row = $res->fetch(PDO::FETCH_ASSOC)): ?>
-                    <tr>
-                        <td><b><?=$row['dia_semana']?></b></td>
-                        <td>
-                            <span class="badge bg-light text-dark border">
-                                <?=substr($row['hora_inicio'],0,5)?> - <?=substr($row['hora_fin'],0,5)?>
-                            </span>
-                        </td>
-                        <td><?=$row['materia']?></td>
-                        <td><span class="badge bg-secondary opacity-75"><?=$row['aula']?></span></td>
-                        <td class="text-center">
-                            <a href="?edit=<?=$row['id']?>" class="btn btn-sm btn-warning rounded-pill px-3">Editar</a>
-                            <a href="?del=<?=$row['id']?>" class="btn btn-sm btn-outline-danger rounded-pill px-2" onclick="return confirm('¿Borrar?')">✕</a>
-                        </td>
-                    </tr>
-                    <?php endwhile; ?>
+                    <?php if(empty($mis_clases)): ?>
+                        <tr><td colspan="5" class="text-center text-muted">No tienes clases registradas. ¡Añade la primera arriba!</td></tr>
+                    <?php else: ?>
+                        <?php foreach($mis_clases as $row): ?>
+                        <tr>
+                            <td><b><?=$row['dia_semana']?></b></td>
+                            <td>
+                                <span class="badge bg-light text-dark border">
+                                    <?=substr($row['hora_inicio'],0,5)?> - <?=substr($row['hora_fin'],0,5)?>
+                                </span>
+                            </td>
+                            <td><?=$row['materia']?></td>
+                            <td><span class="badge bg-secondary opacity-75"><?=$row['aula']?></span></td>
+                            <td class="text-center">
+                                <a href="?edit=<?=$row['id']?>" class="btn btn-sm btn-warning rounded-pill px-3">Editar</a>
+                                <a href="?del=<?=$row['id']?>" class="btn btn-sm btn-outline-danger rounded-pill px-2" onclick="return confirm('¿Borrar?')">✕</a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>
