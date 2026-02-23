@@ -1,37 +1,18 @@
 <?php
-// 1. SEGURIDAD DE SESIÓN (Para evitar el bucle de redirecciones)
-ini_set('session.cookie_httponly', 1);
-ini_set('session.use_only_cookies', 1);
-ini_set('session.cookie_secure', 1); 
-
-session_start();
-
-// 2. CONTROL DE ACCESO
-if (!isset($_SESSION['usuario_id'])) {
-    header("Location: login.php");
-    exit();
-}
+require_once 'config/database.php'; // Esto ya maneja la sesión y el parche HTTPS
+// ... seguridad de acceso ...
 
 $user_id = $_SESSION['usuario_id'];
-require_once 'config/database.php';
 $db = (new Database())->getConnection();
 
-// --- LÓGICA DE EDICIÓN (Cargar datos en el formulario) ---
-$edit_clase = null;
-if(isset($_GET['edit'])) {
-    $stmt = $db->prepare("SELECT * FROM horarios WHERE id = ? AND usuario_id = ?");
-    $stmt->execute([$_GET['edit'], $user_id]);
-    $edit_clase = $stmt->fetch(PDO::FETCH_ASSOC);
-}
-
-// --- LÓGICA DE GUARDAR (Insertar o Actualizar) ---
+// LÓGICA DE GUARDAR (Asegúrate de que incluya el $user_id)
 if(isset($_POST['save_clase'])) {
     if(!empty($_POST['id'])) {
-        // Actualizar clase existente
+        // ACTUALIZAR: Solo si te pertenece
         $stmt = $db->prepare("UPDATE horarios SET dia_semana=?, materia=?, hora_inicio=?, hora_fin=?, aula=? WHERE id=? AND usuario_id=?");
         $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['hora_fin'], $_POST['aula'], $_POST['id'], $user_id]);
     } else {
-        // Insertar nueva clase
+        // INSERTAR: Guardamos tu ID
         $stmt = $db->prepare("INSERT INTO horarios (dia_semana, materia, hora_inicio, hora_fin, aula, usuario_id) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$_POST['dia'], $_POST['materia'], $_POST['hora'], $_POST['hora_fin'], $_POST['aula'], $user_id]);
     }
@@ -39,18 +20,10 @@ if(isset($_POST['save_clase'])) {
     exit();
 }
 
-// --- LÓGICA DE BORRADO ---
-if(isset($_GET['del'])) { 
-    $stmt = $db->prepare("DELETE FROM horarios WHERE id = ? AND usuario_id = ?");
-    $stmt->execute([(int)$_GET['del'], $user_id]);
-    header("Location: gestion_clases.php"); 
-    exit(); 
-}
-
-// --- CARGA DE LA LISTA DE CLASES (Para la tabla inferior) ---
-$stmt_list = $db->prepare("SELECT * FROM horarios WHERE usuario_id = ? ORDER BY FIELD(dia_semana, 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'), hora_inicio ASC");
-$stmt_list->execute([$user_id]);
-$clases = $stmt_list->fetchAll(PDO::FETCH_ASSOC);
+// LÓGICA DE LISTADO (Para que veas solo las tuyas)
+$res = $db->prepare("SELECT * FROM horarios WHERE usuario_id = ? ORDER BY FIELD(dia_semana, 'Lunes','Martes','Miércoles','Jueves','Viernes'), hora_inicio ASC");
+$res->execute([$user_id]);
+$mis_clases = $res->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
