@@ -61,7 +61,9 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
 <div class="container">
     
     <div class="row mb-4">
-        <div class="col-12">
+        <div class="col-12 text-center">
+            <h1 class="fw-800 text-primary-u mb-0">UniMa 🚀</h1>
+            <p class="text-muted small mb-3">UJI - La Vall d'Uixó</p>
             <a href="https://share.google/JlpEPhzMBl4ICS4uU" target="_blank" class="hub-link shadow-sm">🎓 ENTRAR AL AULA VIRTUAL</a>
         </div>
     </div>
@@ -72,12 +74,12 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
                 <h6 class="fw-800 text-primary-u mb-3">🚌 BUS 360: LA VALL ↔ UJI</h6>
                 <div class="row small">
                     <div class="col-6 text-center">
-                        <span class="fw-bold d-block mb-1 text-muted small">IDA</span>
+                        <span class="fw-bold d-block mb-1 text-muted small">IDA: LA VALL → UJI</span>
                         <?php $ida = ['06:40', '07:50', '09:10', '09:50', '10:50', '11:50', '12:50', '13:45', '15:00', '15:50', '16:30', '17:40', '18:30', '19:45', '20:40']; 
                         foreach($ida as $h) echo "<span class='bus-badge'>$h</span>"; ?>
                     </div>
                     <div class="col-6 text-center border-start">
-                        <span class="fw-bold d-block mb-1 text-muted small">VUELTA</span>
+                        <span class="fw-bold d-block mb-1 text-muted small">VUELTA: UJI → LA VALL</span>
                         <?php $vta = ['07:50', '09:05', '10:25', '11:15', '12:05', '13:05', '14:05', '15:00', '16:15', '17:05', '17:45', '19:00', '19:50', '21:00', '22:00']; 
                         foreach($vta as $h) echo "<span class='bus-badge' style='background:#fff1f2; color:#ef4444;'>$h</span>"; ?>
                     </div>
@@ -170,7 +172,8 @@ $examenes = $db->query("SELECT * FROM examenes WHERE tipo IN ('Examen', 'Trabajo
     function updateCountdowns() {
         const timers = document.querySelectorAll('.countdown-engine');
         timers.forEach(timer => {
-            const target = new Date(timer.getAttribute('data-date')).getTime();
+            const targetStr = timer.getAttribute('data-date');
+            const target = new Date(targetStr).getTime();
             const now = new Date().getTime();
             const diff = target - now;
 
